@@ -1,16 +1,25 @@
-function Get-Amplitude{
+########################## Amplitude Data Extraction #######################
+##### This program is created to download Amplitude Metrics Data  for a user's deployed and Amplitude-integrated app
+##### The data is downloaded in its raw format for local analysis or storage in a data warehouse
+##### To use this program, the user must have access to the production environment of the Amplitude integration for the app
+##### From there, he can download the authorisation token and get the project's key Code
+
+###Functions
+##Download Function
+#This function downloads the amplitude metrics data for the app for one day of observations
+Function Get-Amplitude{
     Param(
+        $authKey,
         $nextDate,
         $downloadFile
         )
 
-$header = @{"Authorization"= "Basic NDRjZjRmY2Y5ODBkN2FiODhmMGI0ODI0N2FiNjhhMzE6NGY2MjQxNTZhNWU0YzFjYWUxNWYzMGUyMzc1ZjE2OGE="
+$authKey = "Basic "+ $authKey
+$header = @{"Authorization"= $authKey
 "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36 Edg/109.0.1518.78"
-#"Connection" = "keep-alive"
 "Host" = "analytics.amplitude.com"
 "authority"="analytics.amplitude.com"
 "method"="GET"
-#"path"="/data/386665/export?start=20230219&end=20230219&downloadId=dkwXBLh"
 "scheme"="https"
 "accept"="text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
 "accept-encoding"="gzip, deflate, br"
@@ -27,11 +36,12 @@ $header = @{"Authorization"= "Basic NDRjZjRmY2Y5ODBkN2FiODhmMGI0ODI0N2FiNjhhMzE6
 
 
 $url = "https://analytics.amplitude.com/api/2/export?start=$nextDate&end=$nextDate&downloadId=bTNEsn6"
-####"https://analytics.amplitude.com/data/386665/export?start=$nextDate&end=$nextDate&downloadId=CZwQPDL"
 
 Invoke-RestMethod  -Uri $url -Headers $header -Outfile $downloadFile
 }
 
+##Extract function
+#This function extracts the app data from a single package to individual hourly gzip files
 Function Extract-Amplitude{
     Param(
         $infile,
@@ -55,6 +65,20 @@ Function Extract-Amplitude{
 }
 
 
+###Parameters
+##Amplitude Authorisation Taken
+$authToken = "NDRjZjRmY2Y5ODBkN2FiODhmMGI0ODI0N2FiNjhhMzE6NGY2MjQxNTZhNWU0YzFjYWUxNWYzMGUyMzc1ZjE2OGE"
+$projectCode = "386665"
+
+##Database connection parameters
+$hostname = "mara-bi-data-poc.cluster-ro-csvsrzen2vtn.eu-west-2.rds.amazonaws.com"
+$dbname = "mara_bi_data_poc"
+$username = "bi_write"
+$password = "69WUdtRZKAxK2uKK"
+$port = "5432"
+
+##Extraction Duration
+#Either use a static start and end date, or extract for previous day only
 $startDate = "15-Nov-2022"
 $startDate = [datetime]::parseexact($startDate, 'dd-MMM-yyyy', $null)
 $startDate = (Get-Date).AddDays(-1) ###comment
@@ -62,6 +86,18 @@ $startDate = (Get-Date).AddDays(-1) ###comment
 $endDate = "30-Nov-2022"
 $endDate = [datetime]::parseexact($endDate, 'dd-MMM-yyyy', $null)
 $endDate = Get-Date ###comment
+
+##Folder for storing the downloaded archives
+$downloadPath = "/Users/victornneji/Documents/amplitude/downloads"
+
+##Staging Table
+$stagingTable = "bi_analytics.stg_amplitude_events"
+
+##Cleaning Up and staging procedure
+$stagingPrc = "bi_analytics.prc_amplitude_events()"
+
+
+
 
 
 $arrayDate = 
@@ -72,11 +108,12 @@ $arrayDate =
 
 foreach($date in $arrayDate) {
 $nextDate = $date
-$downloadPath = "/Users/victornneji/Documents/amplitude/downloads"
+
 $filename = "amplitude_"+$nextDate+".zip"
 $downloadFile = "$downloadPath/$filename"
 $extractPath = "$downloadPath/amplitude_"+$nextDate
 
+###Test if the folder/file exists. If yes, then overwrite
 if (Test-Path $downloadFile) {
     Remove-Item $downloadFile -verbose -Recurse
     Write-Host "Old File for $nextDate Deleted"
@@ -94,11 +131,12 @@ if (Test-Path $extractPath) {
 }
 
 
-Get-Amplitude -nextDate $nextDate -downloadFile  $downloadFile 
+##Execute Download and Extract Functions
+Get-Amplitude -authKey $authToken -nextDate $nextDate -downloadFile  $downloadFile 
 Expand-Archive -path $downloadFile -destinationpath $extractPath
 
 ###EXTRACT GZIP FILES###
-$results = get-childItem "$extractPath/386665/*.gz" 
+$results = get-childItem "$extractPath/$projectCode/*.gz" 
 foreach ($result in $results) {
     $filePath = $result 
     Extract-Amplitude($filePath)
@@ -106,7 +144,7 @@ foreach ($result in $results) {
 
 ###MOVE JSON FILES TO THEIR OWN FOLDER####
 mkdir "$extractPath/json/" 
-$results = get-childItem "$extractPath/386665/*.json" 
+$results = get-childItem "$extractPath/$projectCode/*.json" 
 foreach ($result in $results) {
     Move-Item -path $result -destination "$extractPath/json/" 
 }
@@ -159,24 +197,18 @@ foreach ($result in $results) {
 
 
 ####LOAD TO REMOTE DATABASE####
-$hostname = "mara-bi-data-poc.cluster-ro-csvsrzen2vtn.eu-west-2.rds.amazonaws.com"
-$dbname = "mara_bi_data_poc"
-$username = "bi_write"
-$password = "69WUdtRZKAxK2uKK"
-$port = "5432"
-
-
 $results = get-childItem "$extractPath/csv/" 
-$command = "truncate table bi_analytics.stg_amplitude_events"
+$command = "truncate table $stagingTable"
 psql -d "postgresql://$username`:$password@$hostname`:$port/$dbname" -c $command
 
 foreach ($result in $results) {
     
-    $command = "\copy bi_analytics.stg_amplitude_events from '$result' with delimiter as ',' CSV HEADER"
+    
+    $command = "\copy $stagingTable from '$result' with delimiter as ',' CSV HEADER"
     psql -d "postgresql://$username`:$password@$hostname`:$port/$dbname" -c $command
 }
 
-$command = "call bi_analytics.prc_amplitude_events()"
+$command = "call $stagingPrc"
 psql -d "postgresql://$username`:$password@$hostname`:$port/$dbname" -c $command
 
 Write-Host "$nextDate completed"
