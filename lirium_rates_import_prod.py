@@ -1,3 +1,6 @@
+####### This Program downloads cryptocurrency rates from Lirium periodically and saves locally to a CSV, then uploads the CSV to a database
+####### Execute with grep -v '^%' "lirium_rates_import.py" | python3
+
 def lirium_rates_import(path, engine):
     
     ###Required modules:
@@ -93,11 +96,12 @@ from datetime import timedelta
 import time
 from sqlalchemy import text
 
-path = "/Users/victornneji/Documents/lirium/"
+path = ##"Path To Save CSV Files"
 
-###sleep_cycle = 60
+
+###Create SQL Engine using SQL Alchemy
 %load_ext sql
-%sql postgresql://bi_write:69WUdtRZKAxK2uKK@mara-bi-data-poc.cluster-ro-csvsrzen2vtn.eu-west-2.rds.amazonaws.com/mara_bi_data_poc
-engine = create_engine('postgresql://bi_write:69WUdtRZKAxK2uKK@mara-bi-data-poc.cluster-ro-csvsrzen2vtn.eu-west-2.rds.amazonaws.com/mara_bi_data_poc')
+%sql dbtype://username:password@hostname/dbname
+engine = create_engine('dbtype://username:password@hostname/dbname')
 
 lirium_rates_import(path, engine)
