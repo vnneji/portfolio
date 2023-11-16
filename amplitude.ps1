@@ -67,15 +67,15 @@ Function Extract-Amplitude{
 
 ###Parameters
 ##Amplitude Authorisation Taken
-$authToken = "NDRjZjRmY2Y5ODBkN2FiODhmMGI0ODI0N2FiNjhhMzE6NGY2MjQxNTZhNWU0YzFjYWUxNWYzMGUyMzc1ZjE2OGE"
-$projectCode = "386665"
+$authToken = #### "insert app token" ####
+$projectCode = #### "insert project code" ####
 
 ##Database connection parameters
-$hostname = "mara-bi-data-poc.cluster-ro-csvsrzen2vtn.eu-west-2.rds.amazonaws.com"
-$dbname = "mara_bi_data_poc"
-$username = "bi_write"
-$password = "69WUdtRZKAxK2uKK"
-$port = "5432"
+$hostname = #### "insert db connection host name" ####
+$dbname = #### "insert db name" ####
+$username = #### "insert db connection username" ####
+$password = #### "insert db connection password" ####
+$port = #### "insert db connection port" ####
 
 ##Extraction Duration
 #Either use a static start and end date, or extract for previous day only
@@ -88,13 +88,13 @@ $endDate = [datetime]::parseexact($endDate, 'dd-MMM-yyyy', $null)
 $endDate = Get-Date ###comment
 
 ##Folder for storing the downloaded archives
-$downloadPath = "/Users/victornneji/Documents/amplitude/downloads"
+$downloadPath = #### "local folder download path" ####
 
 ##Staging Table
-$stagingTable = "bi_analytics.stg_amplitude_events"
+$stagingTable = ###"insert staging tahle name"
 
 ##Cleaning Up and staging procedure
-$stagingPrc = "bi_analytics.prc_amplitude_events()"
+$stagingPrc = ######"insert staging procedure here"
 
 
 
