@@ -212,4 +212,4 @@ $command = "call $stagingPrc"
 psql -d "postgresql://$username`:$password@$hostname`:$port/$dbname" -c $command
 
 Write-Host "$nextDate completed"
-}
+} 
